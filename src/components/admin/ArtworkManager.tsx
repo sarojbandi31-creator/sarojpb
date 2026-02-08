@@ -1,0 +1,471 @@
+import { useState } from 'react';
+import { Plus, Edit, Trash2, Search, Image as ImageIcon, Eye } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { useArtworks, type Artwork } from '@/hooks/useArtworks';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface ArtworkFormData {
+  title: string;
+  medium: string;
+  size: string;
+  year: number;
+  description: string;
+  image: string;
+  featured: boolean;
+  price: number;
+  artist: string;
+  artistLocation: string;
+  sold: boolean;
+}
+
+const initialFormData: ArtworkFormData = {
+  title: '',
+  medium: '',
+  size: '',
+  year: new Date().getFullYear(),
+  description: '',
+  image: '',
+  featured: false,
+  price: 0,
+  artist: 'Rasayan',
+  artistLocation: 'India',
+  sold: false,
+};
+
+export default function ArtworkManager() {
+  const { artworks, loading, createArtwork, updateArtwork, deleteArtwork } = useArtworks();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingArtwork, setEditingArtwork] = useState<Artwork | null>(null);
+  const [formData, setFormData] = useState<ArtworkFormData>(initialFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const filteredArtworks = artworks.filter(artwork =>
+    artwork.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    artwork.medium.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    artwork.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(price);
+  };
+
+  const handleOpenDialog = (artwork?: Artwork) => {
+    if (artwork) {
+      setEditingArtwork(artwork);
+      setFormData({
+        title: artwork.title,
+        medium: artwork.medium,
+        size: artwork.size,
+        year: artwork.year,
+        description: artwork.description,
+        image: artwork.image,
+        featured: artwork.featured || false,
+        price: artwork.price,
+        artist: artwork.artist,
+        artistLocation: artwork.artistLocation,
+        sold: artwork.sold || false,
+      });
+    } else {
+      setEditingArtwork(null);
+      setFormData(initialFormData);
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingArtwork(null);
+    setFormData(initialFormData);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      if (editingArtwork) {
+        await updateArtwork(editingArtwork.id, formData);
+      } else {
+        await createArtwork(formData);
+      }
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving artwork:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteArtwork(id);
+  };
+
+  const handleInputChange = (field: keyof ArtworkFormData, value: string | number | boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-serif text-2xl font-medium text-primary">Paintings Management</h2>
+          <p className="text-muted-foreground font-sans mt-1">
+            Manage your artwork collection
+          </p>
+        </div>
+        <Button onClick={() => handleOpenDialog()} className="gap-2">
+          <Plus size={18} />
+          Add New Painting
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-card border border-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-serif font-medium text-primary">{artworks.length}</div>
+          <div className="text-sm text-muted-foreground">Total Paintings</div>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-serif font-medium text-primary">
+            {artworks.filter(a => a.featured).length}
+          </div>
+          <div className="text-sm text-muted-foreground">Featured</div>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-serif font-medium text-primary">
+            {artworks.filter(a => a.sold).length}
+          </div>
+          <div className="text-sm text-muted-foreground">Sold</div>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-serif font-medium text-primary">
+            {artworks.filter(a => !a.sold).length}
+          </div>
+          <div className="text-sm text-muted-foreground">Available</div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search paintings by title, medium, or artist..."
+          className="pl-10"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filteredArtworks.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchQuery ? 'No paintings match your search' : 'No paintings found'}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item No</TableHead>
+                <TableHead>Image</TableHead>
+                <TableHead>Item Name</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Pricing</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredArtworks.map((artwork, index) => (
+                <TableRow key={artwork.id}>
+                  <TableCell className="font-mono text-sm">{index + 1}</TableCell>
+                  <TableCell>
+                    <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+                      {artwork.image ? (
+                        <img
+                          src={artwork.image}
+                          alt={artwork.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon size={20} className="text-muted-foreground" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium text-primary">{artwork.title}</div>
+                      <div className="text-sm text-muted-foreground">{artwork.artist}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-xs truncate text-sm text-muted-foreground">
+                      {artwork.description}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{artwork.medium}</Badge>
+                  </TableCell>
+                  <TableCell className="font-medium">{formatPrice(artwork.price)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {artwork.featured && <Badge variant="default">Featured</Badge>}
+                      {artwork.sold ? (
+                        <Badge variant="destructive">Sold</Badge>
+                      ) : (
+                        <Badge variant="outline">Available</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenDialog(artwork)}
+                        className="gap-1"
+                      >
+                        <Edit size={14} />
+                        Update
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive">
+                            <Trash2 size={14} />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Painting?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete "{artwork.title}". This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(artwork.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingArtwork ? 'Update Painting' : 'Add New Painting'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingArtwork ? 'Modify the painting details below.' : 'Fill in the details for the new painting.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Tabs defaultValue="basic" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                <TabsTrigger value="details">Details & Pricing</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Title *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="artist">Artist *</Label>
+                    <Input
+                      id="artist"
+                      value={formData.artist}
+                      onChange={(e) => handleInputChange('artist', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="medium">Medium/Category *</Label>
+                    <Input
+                      id="medium"
+                      value={formData.medium}
+                      onChange={(e) => handleInputChange('medium', e.target.value)}
+                      placeholder="e.g., Acrylic on Canvas"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="size">Size *</Label>
+                    <Input
+                      id="size"
+                      value={formData.size}
+                      onChange={(e) => handleInputChange('size', e.target.value)}
+                      placeholder="e.g., 30 × 30 cm"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="year">Year *</Label>
+                    <Input
+                      id="year"
+                      type="number"
+                      value={formData.year}
+                      onChange={(e) => handleInputChange('year', parseInt(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="artistLocation">Artist Location</Label>
+                    <Input
+                      id="artistLocation"
+                      value={formData.artistLocation}
+                      onChange={(e) => handleInputChange('artistLocation', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description *</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    rows={3}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="image">Image URL *</Label>
+                  <Input
+                    id="image"
+                    value={formData.image}
+                    onChange={(e) => handleInputChange('image', e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    required
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="details" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price (USD) *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => handleInputChange('price', parseFloat(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="displayPrice">Display Price</Label>
+                    <div className="p-2 bg-muted rounded text-sm font-medium">
+                      {formatPrice(formData.price)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="featured"
+                    checked={formData.featured}
+                    onCheckedChange={(checked) => handleInputChange('featured', checked)}
+                  />
+                  <Label htmlFor="featured">Featured painting</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="sold"
+                    checked={formData.sold}
+                    onCheckedChange={(checked) => handleInputChange('sold', checked)}
+                  />
+                  <Label htmlFor="sold">Mark as sold</Label>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : editingArtwork ? 'Update Painting' : 'Add Painting'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
