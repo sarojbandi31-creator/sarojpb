@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAdmin, loading, signIn, signUp, signInWithGoogle, signInWithFacebook } = useAuth();
+  const { user, isAdmin, loading, roleResolved, signIn, signUp, signInWithGoogle, signInWithFacebook, signOut } = useAuth();
   const { setIsCartOpen } = useCart();
   const { toast } = useToast();
 
@@ -21,24 +21,44 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Wait for auth to finish loading before redirecting
-    if (user && !loading) {
+    // Redirect only when this page was reached as part of a flow requiring return navigation.
+    if (user && !loading && roleResolved) {
       const state = location.state as { returnTo?: string; openCart?: boolean } | null;
-      
+
       if (state?.openCart) {
         setIsCartOpen(true);
       }
-      
-      // Redirect admins to admin panel, regular users to home or returnTo
-      if (isAdmin) {
-        navigate(state?.returnTo || '/admin');
-      } else {
-        // Don't allow non-admin users to access admin page
-        const returnTo = state?.returnTo;
-        navigate((returnTo && returnTo !== '/admin') ? returnTo : '/');
+
+      if (state?.returnTo) {
+        if (isAdmin) {
+          navigate(state.returnTo || '/admin');
+        } else {
+          navigate(state.returnTo !== '/admin' ? state.returnTo : '/');
+        }
       }
     }
-  }, [user, isAdmin, loading, navigate, location, setIsCartOpen]);
+  }, [user, isAdmin, loading, roleResolved, navigate, location, setIsCartOpen]);
+
+  if (!loading && user && !((location.state as { returnTo?: string } | null)?.returnTo)) {
+    return (
+      <div className="min-h-screen pt-24 pb-20 flex items-center justify-center">
+        <div className="w-full max-w-md mx-auto px-4">
+          <div className="bg-card border border-border rounded-lg p-8 shadow-elegant text-center">
+            <h1 className="font-serif text-3xl font-medium text-primary">You are already logged in</h1>
+            <p className="text-muted-foreground mt-3">You can continue browsing or sign out to switch account.</p>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <Button variant="outline" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
+                Continue
+              </Button>
+              <Button onClick={async () => { await signOut(); }}>
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,73 +1,96 @@
-# Welcome to your Lovable project
+# Personal Project (Vite + React + TypeScript)
 
-## Project info
+This project uses Vite, React, TypeScript, Tailwind CSS, and Supabase.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Run locally
 
-## How can I edit this code?
+1. Install dependencies:
 
-There are several ways of editing your application.
+```bash
+npm install
+```
 
-**Use Lovable**
+2. Start dev server:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+3. Build production bundle:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build
+```
 
-**Use GitHub Codespaces**
+4. Preview production build:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run preview
+```
 
-## What technologies are used for this project?
+## Deploy to Vercel (Step-by-step)
 
-This project is built with:
+### 1) Push your code to GitHub
+
+Vercel deploys directly from your GitHub repository.
+
+### 2) Import project in Vercel
+
+- Go to https://vercel.com/new
+- Select your GitHub repo
+- Framework preset: **Vite** (Vercel usually detects this automatically)
+
+### 3) Configure build settings
+
+Use these values if not auto-filled:
+
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
+
+### 4) Add environment variables in Vercel
+
+In your Vercel project settings, open **Settings → Environment Variables** and add the variables your app needs.
+
+Minimum required for this frontend app:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+
+If you use Razorpay from this app, add only public keys to frontend variables. Keep secret keys in secure backend environments only.
+
+### 5) Deploy
+
+- Click **Deploy** in Vercel.
+- Wait for build + deployment to complete.
+
+### 6) Verify production
+
+After deployment:
+
+- Open the generated Vercel URL
+- Test auth/login flow
+- Test gallery/artwork pages
+- Test checkout/payment flow (if enabled)
+
+## Redeploy after changes
+
+Every push to your connected Git branch triggers a new deployment automatically.
+
+## Optional: Deploy using Vercel CLI
+
+```bash
+npm i -g vercel
+vercel login
+vercel
+vercel --prod
+```
+
+## Tech stack
 
 - Vite
+- React 18
 - TypeScript
-- React
-- shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- shadcn/ui
+- Supabase

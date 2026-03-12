@@ -22,7 +22,7 @@ function slugify(text: string): string {
 export default function ArticleEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, roleResolved } = useAuth();
   const { toast } = useToast();
 
   const [title, setTitle] = useState('');
@@ -35,10 +35,10 @@ export default function ArticleEditorPage() {
   const isEditing = !!id;
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
+    if (!loading && (!user || (roleResolved && !isAdmin))) {
       navigate('/auth');
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, roleResolved, loading, navigate]);
 
   useEffect(() => {
     if (isEditing) {

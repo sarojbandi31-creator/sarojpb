@@ -8,6 +8,21 @@ const SUPABASE_PUBLISHABLE_KEY =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const EXPECTED_SUPABASE_REF = 'dcrfsaggvdfjjvinryxt';
+const DEFAULT_SUPABASE_URL = `https://${EXPECTED_SUPABASE_REF}.supabase.co`;
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjcmZzYWdndmRmamp2aW5yeXh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MDk2NjcsImV4cCI6MjA4NDk4NTY2N30.3jwSRMODQSYLGar9uxxeCJ21FYV6Mo-c6gEEbgawwAA';
+
+const RESOLVED_SUPABASE_URL =
+  SUPABASE_URL && SUPABASE_URL.includes(`${EXPECTED_SUPABASE_REF}.supabase.co`)
+    ? SUPABASE_URL
+    : DEFAULT_SUPABASE_URL;
+
+const RESOLVED_SUPABASE_KEY =
+  SUPABASE_PUBLISHABLE_KEY && RESOLVED_SUPABASE_URL === SUPABASE_URL
+    ? SUPABASE_PUBLISHABLE_KEY
+    : DEFAULT_SUPABASE_ANON_KEY;
+
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error('Missing Supabase environment variables');
   console.error('VITE_SUPABASE_URL:', SUPABASE_URL);
@@ -17,10 +32,16 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   );
 }
 
+if (SUPABASE_URL && !SUPABASE_URL.includes(`${EXPECTED_SUPABASE_REF}.supabase.co`)) {
+  console.warn(
+    `Unexpected VITE_SUPABASE_URL detected (${SUPABASE_URL}). Falling back to ${DEFAULT_SUPABASE_URL}.`
+  );
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(RESOLVED_SUPABASE_URL, RESOLVED_SUPABASE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

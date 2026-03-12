@@ -19,6 +19,11 @@ import AuthPage from "./pages/AuthPage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import ArticleDetailPage from "./pages/ArticleDetailPage";
 import AdminPage from "./pages/AdminPage";
+import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import OrdersPage from "./pages/OrdersPage";
+import OrderDetailPage from "./pages/OrderDetailPage";
+import AdminOrdersPage from "./pages/AdminOrdersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,7 +35,12 @@ const App = () => (
         <CartProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <Layout>
               <Routes>
                 <Route path="/" element={<HomePage />} />
@@ -42,10 +52,15 @@ const App = () => (
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/cart" element={<CartPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/orders/:orderId" element={<OrderDetailPage />} />
                 <Route path="/article/new" element={<ArticleEditorPage />} />
                 <Route path="/article/edit/:id" element={<ArticleEditorPage />} />
                 <Route path="/article/:slug" element={<ArticleDetailPage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/admin/orders" element={<AdminOrdersPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>

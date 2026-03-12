@@ -29,6 +29,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ArtworkManager from '@/components/admin/ArtworkManager';
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 interface UserWithRole {
   id: string;
   email: string;
@@ -39,20 +41,36 @@ interface UserWithRole {
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, roleResolved } = useAuth();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setAuthTimedOut(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      console.warn('[AdminPage] auth check timed out, redirecting to /auth');
+      setAuthTimedOut(true);
+      navigate('/auth', { state: { returnTo: '/admin' } });
+    }, ONE_HOUR_MS);
+
+    return () => clearTimeout(timer);
+  }, [loading, navigate]);
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         // Not logged in - redirect to auth with returnTo
         navigate('/auth', { state: { returnTo: '/admin' } });
-      } else if (!isAdmin) {
+      } else if (roleResolved && !isAdmin) {
         // Logged in but not admin - redirect to home
         toast({
           title: 'Access Denied',
@@ -62,7 +80,18 @@ export default function AdminPage() {
         navigate('/');
       }
     }
-  }, [user, isAdmin, loading, navigate, toast]);
+  }, [user, isAdmin, loading, roleResolved, navigate, toast]);
+
+  useEffect(() => {
+    console.log('[AdminPage] auth state', {
+      loading,
+      authTimedOut,
+      hasUser: Boolean(user),
+      userEmail: user?.email || null,
+      isAdmin,
+      roleResolved,
+    });
+  }, [loading, authTimedOut, user, isAdmin, roleResolved]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -188,10 +217,26 @@ export default function AdminPage() {
 
   const adminCount = users.filter(u => u.isAdmin).length;
 
-  if (loading) {
+  if ((loading || (Boolean(user) && !roleResolved)) && !authTimedOut) {
     return (
       <div className="min-h-screen pt-24 pb-20 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loading && authTimedOut) {
+    return (
+      <div className="min-h-screen pt-24 pb-20 flex items-center justify-center">
+        <div className="max-w-md text-center px-4">
+          <h1 className="font-serif text-2xl text-primary">Admin Session Check Delayed</h1>
+          <p className="text-muted-foreground mt-2">
+            Unable to validate your admin session quickly. Please continue to login.
+          </p>
+          <Button className="mt-6" onClick={() => navigate('/auth', { state: { returnTo: '/admin' } })}>
+            Go to Login
+          </Button>
+        </div>
       </div>
     );
   }
@@ -204,6 +249,9 @@ export default function AdminPage() {
           <Button variant="ghost" onClick={() => navigate('/media')} className="gap-2">
             <ArrowLeft size={18} />
             Back
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/admin/orders')}>
+            Manage Orders
           </Button>
         </div>
 

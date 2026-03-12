@@ -14,13 +14,36 @@ const sanitizeAuthInput = (value: string) =>
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+};
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [roleResolved, setRoleResolved] = useState(false);
 
   useEffect(() => {
+    const loadingSafetyTimer = setTimeout(() => {
+      console.warn('Auth loading safety timer triggered - releasing loading state');
+      setLoading(false);
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -29,18 +52,26 @@ export function useAuth() {
 
         // Ensure profile exists for authenticated user
         if (session?.user) {
+          setRoleResolved(false);
+
           // Create profile if needed (fire and forget)
           (async () => {
             const { data, error } = await supabase.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
 
+            if (error) {
+              // Avoid insert attempts when profile read itself fails due temporary DB policy issues.
+              console.error('Failed to read profile', error);
+              return;
+            }
+
             if (!data) {
               // Profile doesn't exist, create it
               // NOTE: This requires RLS policy allowing users to insert their own profiles
-              const { error: insertError } = await supabase.from('profiles').insert({
+              const { error: insertError } = await supabase.from('profiles').upsert({
                 id: session.user.id,
                 email: session.user.email || '',
                 display_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-              });
+              }, { onConflict: 'id' });
 
               if (insertError) {
                 // Ignore unique constraint violation (23505) and RLS policy violations (42501)
@@ -51,28 +82,55 @@ export function useAuth() {
             }
           })();
 
-          // Wait for admin check to complete before setting loading to false
-          await checkAdminRole(session.user.id, session.user.email);
+          // Do not block the whole app on role check.
           setLoading(false);
+          checkAdminRole(session.user.id, session.user.email).finally(() => {
+            setRoleResolved(true);
+          });
         } else {
           setIsAdmin(false);
+          setRoleResolved(true);
           setLoading(false);
         }
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    (async () => {
+      try {
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          ONE_HOUR_MS,
+          'auth.getSession'
+        );
 
-      if (session?.user) {
-        await checkAdminRole(session.user.id, session.user.email);
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          setRoleResolved(false);
+          checkAdminRole(session.user.id, session.user.email).finally(() => {
+            setRoleResolved(true);
+          });
+        } else {
+          setIsAdmin(false);
+          setRoleResolved(true);
+        }
+      } catch (err) {
+        console.error('Initial session check failed/timed out', err);
+        setSession(null);
+        setUser(null);
+        setIsAdmin(false);
+        setRoleResolved(true);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    })();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(loadingSafetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkAdminRole = async (userId: string, userEmail?: string | null) => {
@@ -81,16 +139,37 @@ export function useAuth() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .maybeSingle();
+    try {
+      const { data: rpcHasRole, error: rpcError } = await withTimeout(
+        supabase.rpc('has_role', { _role: 'admin', _user_id: userId }),
+        ONE_HOUR_MS,
+        'checkAdminRole.rpc.has_role'
+      );
 
-    if (!error && data) {
-      setIsAdmin(true);
-    } else {
+      if (!rpcError && rpcHasRole === true) {
+        setIsAdmin(true);
+        return;
+      }
+
+      const { data, error } = await withTimeout(
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle(),
+        ONE_HOUR_MS,
+        'checkAdminRole'
+      );
+
+      if (!error && data) {
+        setIsAdmin(true);
+        return;
+      }
+
+      setIsAdmin(false);
+    } catch (err) {
+      console.error('Admin role check failed/timed out', err);
       setIsAdmin(false);
     }
   };
@@ -248,5 +327,6 @@ export function useAuth() {
     signInWithGoogle,
     signInWithFacebook,
     signOut,
+    roleResolved,
   };
 }

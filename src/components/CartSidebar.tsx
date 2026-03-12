@@ -1,9 +1,8 @@
-import { ShoppingCart, X, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useCart } from '@/contexts/CartContext';
 import { Separator } from '@/components/ui/separator';
-import { useRazorpay } from '@/hooks/useRazorpay';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -19,7 +18,6 @@ export function CartSidebar() {
     setIsCartOpen,
   } = useCart();
 
-  const { initiatePayment, isLoading } = useRazorpay();
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -35,9 +33,7 @@ export function CartSidebar() {
   };
 
   const handleCheckout = async () => {
-    const total = getCartTotal();
-
-    if (total <= 0) {
+    if (getCartTotal() <= 0) {
       toast({
         title: 'Empty Cart',
         description: 'Please add items to your cart before checkout',
@@ -61,27 +57,8 @@ export function CartSidebar() {
       return;
     }
 
-    initiatePayment({
-      amount: total,
-      currency: 'INR',
-      name: 'Rasayan Art Gallery',
-      description: `Purchase of ${getItemCount()} artwork(s)`,
-      onSuccess: (paymentId, orderId) => {
-        toast({
-          title: 'Payment Successful!',
-          description: `Your order has been placed. Payment ID: ${paymentId}`,
-        });
-        clearCart();
-        setIsCartOpen(false);
-      },
-      onError: (error) => {
-        toast({
-          title: 'Payment Failed',
-          description: error || 'Something went wrong with your payment',
-          variant: 'destructive',
-        });
-      },
-    });
+    setIsCartOpen(false);
+    navigate('/checkout');
   };
 
   return (
@@ -181,7 +158,7 @@ export function CartSidebar() {
             <div className="border-t border-border pt-4 space-y-4">
               <div className="flex items-center justify-between">
                 <button
-                  onClick={clearCart}
+                  onClick={() => clearCart()}
                   className="text-sm text-muted-foreground hover:text-destructive transition-colors"
                 >
                   Clear Cart
@@ -212,16 +189,8 @@ export function CartSidebar() {
                 className="w-full"
                 size="lg"
                 onClick={handleCheckout}
-                disabled={isLoading}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  'Check out'
-                )}
+                Check out
               </Button>
             </div>
           </>

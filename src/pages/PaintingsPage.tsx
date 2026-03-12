@@ -28,6 +28,14 @@ export default function PaintingsPage() {
     return b.price - a.price;
   });
 
+  console.log('[PaintingsPage] render', {
+    loading,
+    totalArtworks: artworks.length,
+    filteredArtworks: filteredArtworks.length,
+    activeCategoryId,
+    sortBy,
+  });
+
   const handleAddToCart = (artwork: Artwork) => {
     addToCart(artwork);
   };
@@ -86,79 +94,89 @@ export default function PaintingsPage() {
       {/* Paintings Grid */}
       <section className="py-12 md:py-16">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-            {sortedArtworks.map((artwork, index) => (
-              <article
-                key={artwork.id}
-                className="group animate-fade-up"
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <div className="grid md:grid-cols-5 gap-6 items-start">
-                  <button
-                    onClick={() => setSelectedArtwork(artwork)}
-                    className="md:col-span-2 w-full aspect-square overflow-hidden rounded-sm artistic-border hover-lift bg-accent flex items-center justify-center"
-                  >
-                    <img
-                      src={artwork.image}
-                      alt={artwork.title}
-                      loading="lazy"
-                      decoding="async"
-                      className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </button>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : sortedArtworks.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No paintings found for the selected filters.
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+              {sortedArtworks.map((artwork, index) => (
+                <article
+                  key={artwork.id}
+                  className="group animate-fade-up"
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <div className="grid md:grid-cols-5 gap-6 items-start">
+                    <button
+                      onClick={() => setSelectedArtwork(artwork)}
+                      className="md:col-span-2 w-full aspect-square overflow-hidden rounded-sm artistic-border hover-lift bg-accent flex items-center justify-center"
+                    >
+                      <img
+                        src={artwork.image}
+                        alt={artwork.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </button>
 
-                  <div className="md:col-span-3">
-                    <div className="flex items-center gap-3">
-                      <p className="font-serif text-xl font-semibold text-primary">
-                        {formatPrice(artwork.price)}
+                    <div className="md:col-span-3">
+                      <div className="flex items-center gap-3">
+                        <p className="font-serif text-xl font-semibold text-primary">
+                          {formatPrice(artwork.price)}
+                        </p>
+                        {artwork.sold && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-highlight text-highlight-foreground rounded">
+                            Sold
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="font-serif text-lg md:text-xl font-medium text-primary mt-1">
+                        {artwork.title} Painting
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {artwork.artist}, {artwork.artist_location}
                       </p>
-                      {artwork.sold && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-highlight text-highlight-foreground rounded">
-                          Sold
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="font-serif text-lg md:text-xl font-medium text-primary mt-1">
-                      {artwork.title} Painting
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {artwork.artist}, {artwork.artist_location}
-                    </p>
-                    <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                      <p>{artwork.medium}</p>
-                      <p>{artwork.size}</p>
-                    </div>
-                    <p className="mt-4 text-muted-foreground font-sans text-sm leading-relaxed line-clamp-2">
-                      {artwork.description}
-                    </p>
-                    <div className="mt-4 flex items-center gap-3">
-                      {artwork.sold ? (
-                        <Button size="sm" disabled className="gap-2 opacity-50">
-                          <ShoppingCart size={16} />
-                          Sold
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleAddToCart(artwork)}
-                          size="sm"
-                          className="gap-2"
+                      <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                        <p>{artwork.medium}</p>
+                        <p>{artwork.size}</p>
+                      </div>
+                      <p className="mt-4 text-muted-foreground font-sans text-sm leading-relaxed line-clamp-2">
+                        {artwork.description}
+                      </p>
+                      <div className="mt-4 flex items-center gap-3">
+                        {artwork.sold ? (
+                          <Button size="sm" disabled className="gap-2 opacity-50">
+                            <ShoppingCart size={16} />
+                            Sold
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleAddToCart(artwork)}
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <ShoppingCart size={16} />
+                            Add to Cart
+                          </Button>
+                        )}
+                        <button
+                          onClick={() => setSelectedArtwork(artwork)}
+                          className="text-sm text-accent hover:text-primary transition-colors font-sans"
                         >
-                          <ShoppingCart size={16} />
-                          Add to Cart
-                        </Button>
-                      )}
-                      <button
-                        onClick={() => setSelectedArtwork(artwork)}
-                        className="text-sm text-accent hover:text-primary transition-colors font-sans"
-                      >
-                        View Details →
-                      </button>
+                          View Details →
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Artwork } from '@/hooks/useArtworks';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface CartItem {
   artwork: Artwork;
@@ -8,10 +9,10 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (artwork: Artwork) => void;
-  removeFromCart: (artworkId: string) => void;
-  updateQuantity: (artworkId: string, quantity: number) => void;
-  clearCart: () => void;
+  addToCart: (artwork: Artwork) => Promise<void>;
+  removeFromCart: (artworkId: string) => Promise<void>;
+  updateQuantity: (artworkId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
   getCartTotal: () => number;
   getItemCount: () => number;
   isCartOpen: boolean;
@@ -23,8 +24,146 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const addToCart = (artwork: Artwork) => {
+  const db = supabase as any;
+
+  const getOrCreateActiveCartId = useCallback(async (uid: string) => {
+    const { data: existingCart, error: findError } = await db
+      .from('carts')
+      .select('id')
+      .eq('user_id', uid)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (findError) throw findError;
+    if (existingCart?.id) return existingCart.id as string;
+
+    const { data: createdCart, error: createError } = await db
+      .from('carts')
+      .insert({ user_id: uid, status: 'active' })
+      .select('id')
+      .single();
+
+    if (createError) throw createError;
+    return createdCart.id as string;
+  }, [db]);
+
+  const loadCartFromDb = useCallback(async (uid: string) => {
+    const cartId = await getOrCreateActiveCartId(uid);
+
+    const { data, error } = await db
+      .from('cart_items')
+      .select('quantity, artwork_id, artworks(*)')
+      .eq('cart_id', cartId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const mappedItems: CartItem[] = (data || [])
+      .filter((row: any) => row.artworks)
+      .map((row: any) => ({
+        artwork: {
+          ...row.artworks,
+          image: row.artworks.image_url,
+          artist: row.artworks.artist || 'Unknown Artist',
+          artistLocation: row.artworks.artist_location || '',
+        },
+        quantity: row.quantity,
+      }));
+
+    setItems(mappedItems);
+  }, [db, getOrCreateActiveCartId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      const uid = session?.user?.id || null;
+      setUserId(uid);
+      if (uid) {
+        try {
+          await loadCartFromDb(uid);
+        } catch (error) {
+          console.error('Failed to load cart', error);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, session) => {
+      const uid = session?.user?.id || null;
+      setUserId(uid);
+
+      if (!uid) {
+        setItems([]);
+        return;
+      }
+
+      try {
+        await loadCartFromDb(uid);
+      } catch (error) {
+        console.error('Failed to sync cart on auth state change', error);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [loadCartFromDb]);
+
+  const addToCart = async (artwork: Artwork) => {
+    if (!userId) {
+      setItems((prev) => {
+        const existingItem = prev.find((item) => item.artwork.id === artwork.id);
+        if (existingItem) {
+          return prev.map((item) =>
+            item.artwork.id === artwork.id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        }
+        return [...prev, { artwork, quantity: 1 }];
+      });
+      setIsCartOpen(true);
+      return;
+    }
+
+    try {
+      const cartId = await getOrCreateActiveCartId(userId);
+      const { data: existing, error: existingError } = await db
+        .from('cart_items')
+        .select('id, quantity')
+        .eq('cart_id', cartId)
+        .eq('artwork_id', artwork.id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (existing?.id) {
+        const { error: updateError } = await db
+          .from('cart_items')
+          .update({ quantity: existing.quantity + 1 })
+          .eq('id', existing.id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await db.from('cart_items').insert({
+          cart_id: cartId,
+          artwork_id: artwork.id,
+          quantity: 1,
+          unit_price: artwork.price,
+        });
+        if (insertError) throw insertError;
+      }
+
+      await loadCartFromDb(userId);
+      setIsCartOpen(true);
+      return;
+    } catch (error) {
+      console.error('Failed to add item to cart', error);
+    }
+
     setItems((prev) => {
       const existingItem = prev.find((item) => item.artwork.id === artwork.id);
       if (existingItem) {
@@ -39,15 +178,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setIsCartOpen(true);
   };
 
-  const removeFromCart = (artworkId: string) => {
+  const removeFromCart = async (artworkId: string) => {
+    if (userId) {
+      try {
+        const cartId = await getOrCreateActiveCartId(userId);
+        await db.from('cart_items').delete().eq('cart_id', cartId).eq('artwork_id', artworkId);
+      } catch (error) {
+        console.error('Failed to remove cart item', error);
+      }
+    }
+
     setItems((prev) => prev.filter((item) => item.artwork.id !== artworkId));
   };
 
-  const updateQuantity = (artworkId: string, quantity: number) => {
+  const updateQuantity = async (artworkId: string, quantity: number) => {
     if (quantity < 1) {
       removeFromCart(artworkId);
       return;
     }
+
+    if (userId) {
+      try {
+        const cartId = await getOrCreateActiveCartId(userId);
+        await db
+          .from('cart_items')
+          .update({ quantity })
+          .eq('cart_id', cartId)
+          .eq('artwork_id', artworkId);
+      } catch (error) {
+        console.error('Failed to update cart quantity', error);
+      }
+    }
+
     setItems((prev) =>
       prev.map((item) =>
         item.artwork.id === artworkId ? { ...item, quantity } : item
@@ -55,7 +217,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
+    if (userId) {
+      try {
+        const cartId = await getOrCreateActiveCartId(userId);
+        await db.from('cart_items').delete().eq('cart_id', cartId);
+      } catch (error) {
+        console.error('Failed to clear cart', error);
+      }
+    }
     setItems([]);
   };
 

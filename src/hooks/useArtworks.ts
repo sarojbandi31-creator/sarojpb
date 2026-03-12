@@ -25,51 +25,12 @@ export interface Artwork {
 
 type ArtworkMutationInput = Omit<Artwork, 'id' | 'created_at' | 'updated_at'>;
 
-// Fallback mock data in case Supabase is unavailable
-const MOCK_ARTWORKS: Artwork[] = [
-  {
-    id: '1a19d408-fdc5-46d8-b12b-0922f6d7ce31',
-    title: 'Acrylic 1',
-    medium: 'Acrylic on Canvas',
-    size: '30 × 30 cm',
-    year: '2024',
-    description: 'A vibrant acrylic painting showcasing bold colors and expressive brushwork.',
-    image_url: '/gallery/acrylic-1.jpg',
-    image: '/gallery/acrylic-1.jpg',
-    featured: true,
-    price: 12500,
-    artist: 'Your Artist Name',
-    sold: false,
-  },
-  {
-    id: '436fb657-26a0-4e47-a18a-3d4623fd35e2',
-    title: 'Acrylic 3',
-    medium: 'Acrylic on Canvas',
-    size: '30 × 30 cm',
-    year: '2024',
-    description: 'A vibrant acrylic painting showcasing bold colors and expressive brushwork.',
-    image_url: '/gallery/acrylic-3.jpg',
-    image: '/gallery/acrylic-3.jpg',
-    featured: true,
-    price: 18200,
-    artist: 'Your Artist Name',
-    sold: false,
-  },
-  {
-    id: '3bf87b88-7ee8-4bd1-ae3e-2519d5a4db14',
-    title: 'Acrylic 7',
-    medium: 'Acrylic on Canvas',
-    size: '30 × 30 cm',
-    year: '2024',
-    description: 'A vibrant acrylic painting showcasing bold colors and expressive brushwork.',
-    image_url: '/gallery/acrylic-7.jpg',
-    image: '/gallery/acrylic-7.jpg',
-    featured: true,
-    price: 29800,
-    artist: 'Your Artist Name',
-    sold: false,
-  },
-];
+const ARTWORKS_CACHE_KEY = 'artworks_cache_v1';
+const ARTWORKS_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+const EXPECTED_SUPABASE_REF = 'dcrfsaggvdfjjvinryxt';
+const DEFAULT_SUPABASE_URL = `https://${EXPECTED_SUPABASE_REF}.supabase.co`;
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjcmZzYWdndmRmamp2aW5yeXh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MDk2NjcsImV4cCI6MjA4NDk4NTY2N30.3jwSRMODQSYLGar9uxxeCJ21FYV6Mo-c6gEEbgawwAA';
 
 export function useArtworks() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -126,45 +87,150 @@ export function useArtworks() {
   const getSupabaseErrorMessage = (err: any, fallback: string) =>
     err?.message || err?.details || err?.hint || fallback;
 
-  const fetchArtworks = async () => {
-    setLoading(true);
-    setIsOffline(false);
-    
+  const readCachedArtworks = (): Artwork[] | null => {
     try {
-      const { data, error } = await supabase
-        .from('artworks')
-        .select('*');
+      const raw = localStorage.getItem(ARTWORKS_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { timestamp: number; data: Artwork[] };
+      if (!parsed?.timestamp || !Array.isArray(parsed?.data)) return null;
+      if (Date.now() - parsed.timestamp > ARTWORKS_CACHE_MAX_AGE_MS) return null;
+      return parsed.data;
+    } catch {
+      return null;
+    }
+  };
 
-      if (error) {
-        throw error;
+  const writeCachedArtworks = (data: Artwork[]) => {
+    try {
+      localStorage.setItem(
+        ARTWORKS_CACHE_KEY,
+        JSON.stringify({
+          timestamp: Date.now(),
+          data,
+        })
+      );
+    } catch {
+      // Ignore storage write failures.
+    }
+  };
+
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutLabel: string): Promise<T> => {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`${timeoutLabel} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  };
+
+  const fetchArtworksViaRest = async (timeoutMs = 5000) => {
+    const envUrl = import.meta.env.VITE_SUPABASE_URL;
+    const url = envUrl && envUrl.includes(`${EXPECTED_SUPABASE_REF}.supabase.co`) ? envUrl : DEFAULT_SUPABASE_URL;
+    const key =
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      DEFAULT_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+      throw new Error('Supabase REST fallback unavailable: missing env credentials');
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(
+        `${url}/rest/v1/artworks?select=id,title,medium,size,year,description,image_url,featured,price,artist_id,sold,category_id,created_at,updated_at`,
+        {
+          method: 'GET',
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+          },
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`REST fallback failed (${response.status}): ${body}`);
       }
 
-      if (data) {
-        const transformedData = data.map(normalizeArtwork);
-        setArtworks(transformedData);
+      const rows = await response.json();
+      console.log('[useArtworks] fetchArtworks:rest-success', { rowCount: rows?.length ?? 0 });
+      return rows as any[];
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
-        if (transformedData.length === 0) {
-          toast({
-            title: 'No artworks in database',
-            description: 'The artworks query returned 0 rows. Check RLS SELECT policy and table data.',
-            variant: 'default',
-          });
-        }
+  const fetchArtworksViaSupabase = async (timeoutMs = 5000) => {
+    const { data, error } = await withTimeout(
+      supabase
+        .from('artworks')
+        .select('id, title, medium, size, year, description, image_url, featured, price, artist_id, sold, category_id, created_at, updated_at'),
+      timeoutMs,
+      'supabase.from(artworks).select'
+    );
+
+    if (error) throw error;
+    return (data || []) as any[];
+  };
+
+  const fetchArtworks = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    setIsOffline(false);
+    console.log('[useArtworks] fetchArtworks:start');
+    
+    try {
+      const rows = await Promise.any([
+        fetchArtworksViaRest(5000),
+        fetchArtworksViaSupabase(5000),
+      ]);
+
+      const transformedData = rows.map(normalizeArtwork);
+      setArtworks(transformedData);
+      writeCachedArtworks(transformedData);
+
+      console.log('[useArtworks] fetchArtworks:success', {
+        rowCount: transformedData.length,
+      });
+
+      if (transformedData.length === 0) {
+        toast({
+          title: 'No artworks in database',
+          description: 'The artworks query returned 0 rows. Add artworks in admin or check RLS policies.',
+          variant: 'default',
+        });
       }
     } catch (err: any) {
       console.error('Error fetching artworks:', err?.message);
-      
-      // Use mock data as fallback
-      setArtworks(MOCK_ARTWORKS);
+      console.error('[useArtworks] fetchArtworks:error', {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint,
+      });
+
+      // Keep actual database state visible instead of silently masking errors with mock data.
+      setArtworks([]);
       setIsOffline(true);
       
       toast({
-        title: 'Offline Mode',
-        description: 'Unable to connect to Supabase. Showing sample artworks.',
-        variant: 'default',
+        title: 'Failed to load artworks',
+        description: getSupabaseErrorMessage(err, 'Unable to connect to Supabase or query artworks'),
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
+      console.log('[useArtworks] fetchArtworks:end');
     }
   };
 
@@ -181,7 +247,11 @@ export function useArtworks() {
       if (error) throw error;
 
       const normalizedArtwork = normalizeArtwork(data);
-      setArtworks(prev => [normalizedArtwork, ...prev]);
+      setArtworks(prev => {
+        const next = [normalizedArtwork, ...prev];
+        writeCachedArtworks(next);
+        return next;
+      });
       toast({
         title: 'Success',
         description: 'Artwork created successfully',
@@ -211,9 +281,13 @@ export function useArtworks() {
       if (error) throw error;
 
       const normalizedArtwork = normalizeArtwork(data);
-      setArtworks(prev => prev.map(artwork =>
-        artwork.id === id ? normalizedArtwork : artwork
-      ));
+      setArtworks(prev => {
+        const next = prev.map(artwork =>
+          artwork.id === id ? normalizedArtwork : artwork
+        );
+        writeCachedArtworks(next);
+        return next;
+      });
       toast({
         title: 'Success',
         description: 'Artwork updated successfully',
@@ -239,7 +313,11 @@ export function useArtworks() {
 
       if (error) throw error;
 
-      setArtworks(prev => prev.filter(artwork => artwork.id !== id));
+      setArtworks(prev => {
+        const next = prev.filter(artwork => artwork.id !== id);
+        writeCachedArtworks(next);
+        return next;
+      });
       toast({
         title: 'Success',
         description: 'Artwork deleted successfully',
@@ -256,7 +334,14 @@ export function useArtworks() {
   };
 
   useEffect(() => {
-    fetchArtworks();
+    const cached = readCachedArtworks();
+    if (cached && cached.length > 0) {
+      setArtworks(cached);
+      setLoading(false);
+      fetchArtworks(false);
+    } else {
+      fetchArtworks(true);
+    }
 
     const channel = supabase
       .channel('artworks-realtime')
@@ -265,7 +350,7 @@ export function useArtworks() {
         { event: '*', schema: 'public', table: 'artworks' },
         () => {
           // Keep all hook instances in sync after admin CRUD operations.
-          fetchArtworks();
+          fetchArtworks(false);
         }
       )
       .subscribe();
