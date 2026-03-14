@@ -101,7 +101,7 @@ export default function ContactPage() {
     }));
   };
 
-  const whatsappNumber = '919492710600';
+  const whatsappNumber = '919960195771';
   const whatsappLink = `https://wa.me/${whatsappNumber}`;
 
   return (
@@ -212,7 +212,7 @@ export default function ContactPage() {
                       Chat on WhatsApp
                     </h3>
                     <p className="text-muted-foreground">
-                      +91 94927 10600
+                      +91 99601 95771
                     </p>
                   </div>
                 </a>
@@ -224,10 +224,10 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-sans font-medium text-primary">Email</h3>
                     <a
-                      href="mailto:hello@rasayanart.com"
+                      href="mailto:sarojbandi31@gmail.com"
                       className="text-muted-foreground hover:text-accent transition-colors"
                     >
-                      hello@rasayanart.com
+                      sarojbandi31@gmail.com
                     </a>
                   </div>
                 </div>
