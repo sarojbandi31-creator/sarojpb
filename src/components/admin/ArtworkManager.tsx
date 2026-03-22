@@ -59,6 +59,14 @@ interface ArtworkFormData {
   artist_id?: string;
   sold: boolean;
   category_id: string;
+  status: string;
+  quantity: number;
+  commission_percentage: number;
+  packaging_type: string;
+  shipping_weight: number;
+  number_of_panels: number;
+  ready_to_hang: boolean;
+  decorative_frame: boolean;
 }
 
 const initialFormData: ArtworkFormData = {
@@ -73,6 +81,14 @@ const initialFormData: ArtworkFormData = {
   artist_id: undefined,
   sold: false,
   category_id: '',
+  status: 'For Sale',
+  quantity: 1,
+  commission_percentage: 60,
+  packaging_type: '',
+  shipping_weight: 0,
+  number_of_panels: 1,
+  ready_to_hang: false,
+  decorative_frame: false,
 };
 
 export default function ArtworkManager() {
@@ -114,6 +130,14 @@ export default function ArtworkManager() {
         artist_id: artwork.artist_id || user?.id,
         sold: artwork.sold || false,
         category_id: artwork.category_id || '',
+        status: artwork.status || 'For Sale',
+        quantity: artwork.quantity || 1,
+        commission_percentage: artwork.commission_percentage || 60,
+        packaging_type: artwork.packaging_type || '',
+        shipping_weight: artwork.shipping_weight || 0,
+        number_of_panels: artwork.number_of_panels || 1,
+        ready_to_hang: artwork.ready_to_hang || false,
+        decorative_frame: artwork.decorative_frame || false,
       });
     } else {
       setEditingArtwork(null);
@@ -482,6 +506,130 @@ export default function ArtworkManager() {
                     onCheckedChange={(checked) => handleInputChange('sold', checked)}
                   />
                   <Label htmlFor="sold">Mark as sold</Label>
+                </div>
+
+                {/* Price & Details Section */}
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-semibold text-primary mb-4">Price & Details</h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Input
+                        id="status"
+                        type="text"
+                        value={formData.status}
+                        onChange={(e) => handleInputChange('status', e.target.value)}
+                        placeholder="e.g., For Sale, Not For Sale"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        min="1"
+                        value={formData.quantity}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          handleInputChange('quantity', val > 0 ? val : 1);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="commission">Commission Percentage</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="commission"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={formData.commission_percentage}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          handleInputChange('commission_percentage', val >= 0 ? val : 0);
+                        }}
+                        className="flex-1"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                      <span className="text-sm font-medium">
+                        ${((formData.price * formData.commission_percentage) / 100).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Weight & Packaging */}
+                  <div className="border-t mt-6 pt-6">
+                    <h4 className="text-sm font-semibold text-primary mb-4">Weight & Packaging</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="packagingType">Packaging Type</Label>
+                        <Input
+                          id="packagingType"
+                          type="text"
+                          value={formData.packaging_type}
+                          onChange={(e) => handleInputChange('packaging_type', e.target.value)}
+                          placeholder="e.g., Tube, Box, Envelope"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="shippingWeight">Shipping Weight (lb)</Label>
+                        <Input
+                          id="shippingWeight"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={formData.shipping_weight}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            handleInputChange('shipping_weight', val >= 0 ? val : 0);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Details */}
+                  <div className="border-t mt-6 pt-6">
+                    <h4 className="text-sm font-semibold text-primary mb-4">Additional Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="numberOfPanels">Number of Panels</Label>
+                        <Input
+                          id="numberOfPanels"
+                          type="number"
+                          min="1"
+                          value={formData.number_of_panels}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            handleInputChange('number_of_panels', val > 0 ? val : 1);
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="readyToHang"
+                          checked={formData.ready_to_hang}
+                          onCheckedChange={(checked) => handleInputChange('ready_to_hang', checked)}
+                        />
+                        <Label htmlFor="readyToHang">Ready to Hang</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="decorativeFrame"
+                          checked={formData.decorative_frame}
+                          onCheckedChange={(checked) => handleInputChange('decorative_frame', checked)}
+                        />
+                        <Label htmlFor="decorativeFrame">Decorative Frame</Label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

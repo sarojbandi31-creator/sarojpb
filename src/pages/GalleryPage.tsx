@@ -5,6 +5,7 @@ import { X, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useArtworks, type Artwork } from '@/hooks/useArtworks';
+import PriceAndDetailsSection from '@/components/PriceAndDetailsSection';
 
 export default function GalleryPage() {
   const [activeMedium, setActiveMedium] = useState<string>('all');
@@ -152,7 +153,7 @@ export default function GalleryPage() {
               />
             </div>
 
-            <div className="md:w-1/3 p-6 md:p-8 flex flex-col justify-center">
+            <div className="md:w-1/3 p-6 md:p-8 flex flex-col justify-start overflow-y-auto max-h-[85vh]">
               {/* Price */}
               <p className="font-serif text-2xl md:text-3xl font-semibold text-primary">
                 {formatPrice(selectedArtwork.price)}
@@ -179,10 +180,15 @@ export default function GalleryPage() {
                 {selectedArtwork.description}
               </p>
 
+              {/* Price & Details Section */}
+              <div className="mt-8">
+                <PriceAndDetailsSection artwork={selectedArtwork} readOnly={true} />
+              </div>
+
               {/* Add to Cart Button */}
               <Button 
                 onClick={handleAddToCart}
-                className="mt-6 w-full gap-2"
+                className="mt-8 w-full gap-2"
                 size="lg"
               >
                 <ShoppingCart size={18} />

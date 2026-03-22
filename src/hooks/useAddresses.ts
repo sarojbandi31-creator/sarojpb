@@ -28,11 +28,33 @@ export function useAddresses() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const getCurrentUserId = useCallback(async () => {
+    const {
+      data: { user },
+      error,
+    } = await db.auth.getUser();
+
+    if (error) {
+      return null;
+    }
+
+    return user?.id || null;
+  }, []);
+
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
+
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      setAddresses([]);
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await db
       .from('addresses')
       .select('*')
+      .eq('user_id', userId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -48,7 +70,7 @@ export function useAddresses() {
 
     setAddresses((data || []) as Address[]);
     setLoading(false);
-  }, [toast]);
+  }, [getCurrentUserId, toast]);
 
   useEffect(() => {
     fetchAddresses();
@@ -56,6 +78,16 @@ export function useAddresses() {
 
   const addAddress = useCallback(
     async (payload: AddressInput) => {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in to save delivery addresses',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
       const trimmed = {
         ...payload,
         full_name: payload.full_name.trim(),
@@ -69,10 +101,18 @@ export function useAddresses() {
       };
 
       if (trimmed.is_default) {
-        await db.from('addresses').update({ is_default: false }).eq('is_default', true);
+        await db
+          .from('addresses')
+          .update({ is_default: false })
+          .eq('user_id', userId)
+          .eq('is_default', true);
       }
 
-      const { data, error } = await db.from('addresses').insert(trimmed).select('*').single();
+      const { data, error } = await db
+        .from('addresses')
+        .insert({ ...trimmed, user_id: userId })
+        .select('*')
+        .single();
 
       if (error) {
         toast({
@@ -86,11 +126,21 @@ export function useAddresses() {
       setAddresses((prev) => [data as Address, ...prev.filter((a) => !(trimmed.is_default && a.is_default))]);
       return data as Address;
     },
-    [toast]
+    [getCurrentUserId, toast]
   );
 
   const updateAddress = useCallback(
     async (id: string, payload: Partial<AddressInput>) => {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in to update delivery addresses',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
       const nextPayload = {
         ...payload,
         full_name: payload.full_name?.trim(),
@@ -104,13 +154,19 @@ export function useAddresses() {
       };
 
       if (nextPayload.is_default) {
-        await db.from('addresses').update({ is_default: false }).neq('id', id).eq('is_default', true);
+        await db
+          .from('addresses')
+          .update({ is_default: false })
+          .eq('user_id', userId)
+          .neq('id', id)
+          .eq('is_default', true);
       }
 
       const { data, error } = await db
         .from('addresses')
         .update(nextPayload)
         .eq('id', id)
+        .eq('user_id', userId)
         .select('*')
         .single();
 
@@ -130,14 +186,24 @@ export function useAddresses() {
       );
       return data as Address;
     },
-    [toast]
+    [getCurrentUserId, toast]
   );
 
   const deleteAddress = useCallback(
     async (id: string) => {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in to delete delivery addresses',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
       const current = addresses.find((a) => a.id === id);
 
-      const { error } = await db.from('addresses').delete().eq('id', id);
+      const { error } = await db.from('addresses').delete().eq('id', id).eq('user_id', userId);
       if (error) {
         toast({
           title: 'Error',
@@ -150,14 +216,18 @@ export function useAddresses() {
       const remaining = addresses.filter((a) => a.id !== id);
       if (current?.is_default && remaining.length > 0) {
         const fallback = remaining[0];
-        await db.from('addresses').update({ is_default: true }).eq('id', fallback.id);
+        await db
+          .from('addresses')
+          .update({ is_default: true })
+          .eq('id', fallback.id)
+          .eq('user_id', userId);
         fallback.is_default = true;
       }
 
       setAddresses([...remaining]);
       return true;
     },
-    [addresses, toast]
+    [addresses, getCurrentUserId, toast]
   );
 
   return {

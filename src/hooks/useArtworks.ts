@@ -21,6 +21,15 @@ export interface Artwork {
   category_id?: string | null;
   created_at?: string;
   updated_at?: string;
+  // Price & Details fields
+  status?: string;
+  quantity?: number;
+  commission_percentage?: number;
+  packaging_type?: string;
+  shipping_weight?: number;
+  number_of_panels?: number;
+  ready_to_hang?: boolean;
+  decorative_frame?: boolean;
 }
 
 type ArtworkMutationInput = Omit<Artwork, 'id' | 'created_at' | 'updated_at'>;
@@ -45,6 +54,15 @@ export function useArtworks() {
     artist: artwork?.artist || 'Unknown Artist',
     artist_location: artwork?.artist_location || artwork?.artistLocation || '',
     artistLocation: artwork?.artistLocation || artwork?.artist_location || '',
+    // Price & Details with defaults
+    status: artwork?.status || 'For Sale',
+    quantity: artwork?.quantity ?? 1,
+    commission_percentage: artwork?.commission_percentage ?? 60,
+    packaging_type: artwork?.packaging_type || '',
+    shipping_weight: artwork?.shipping_weight ?? 0,
+    number_of_panels: artwork?.number_of_panels ?? 1,
+    ready_to_hang: artwork?.ready_to_hang ?? false,
+    decorative_frame: artwork?.decorative_frame ?? false,
   });
 
   const sanitizeArtworkPayload = <T extends Partial<ArtworkMutationInput>>(artwork: T): T => {
@@ -80,6 +98,28 @@ export function useArtworks() {
         payload.category_id = categoryId;
       }
     }
+
+    // Sanitize new Price & Details fields
+    if ('status' in payload) payload.status = (payload.status || '').trim() || 'For Sale';
+    if ('quantity' in payload) {
+      const parsedQuantity = Number(payload.quantity);
+      payload.quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
+    }
+    if ('commission_percentage' in payload) {
+      const parsedCommission = Number(payload.commission_percentage);
+      payload.commission_percentage = Number.isFinite(parsedCommission) ? parsedCommission : 60;
+    }
+    if ('packaging_type' in payload) payload.packaging_type = (payload.packaging_type || '').trim();
+    if ('shipping_weight' in payload) {
+      const parsedWeight = Number(payload.shipping_weight);
+      payload.shipping_weight = Number.isFinite(parsedWeight) ? parsedWeight : 0;
+    }
+    if ('number_of_panels' in payload) {
+      const parsedPanels = Number(payload.number_of_panels);
+      payload.number_of_panels = Number.isFinite(parsedPanels) && parsedPanels > 0 ? parsedPanels : 1;
+    }
+    if ('ready_to_hang' in payload) payload.ready_to_hang = Boolean(payload.ready_to_hang);
+    if ('decorative_frame' in payload) payload.decorative_frame = Boolean(payload.decorative_frame);
 
     return payload as T;
   };
@@ -146,8 +186,13 @@ export function useArtworks() {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      // Select only core columns - newer Price & Details columns are handled with defaults if missing
+      const selectParams = new URLSearchParams({
+        select: 'id,title,medium,size,year,description,image_url,featured,price,artist_id,sold,category_id'
+      });
+      
       const response = await fetch(
-        `${url}/rest/v1/artworks?select=id,title,medium,size,year,description,image_url,featured,price,artist_id,sold,category_id,created_at,updated_at`,
+        `${url}/rest/v1/artworks?${selectParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -175,7 +220,8 @@ export function useArtworks() {
     const { data, error } = await withTimeout(
       supabase
         .from('artworks')
-        .select('id, title, medium, size, year, description, image_url, featured, price, artist_id, sold, category_id, created_at, updated_at'),
+        // Select only core columns - Price & Details columns handled with defaults if missing
+        .select('id, title, medium, size, year, description, image_url, featured, price, artist_id, sold, category_id'),
       timeoutMs,
       'supabase.from(artworks).select'
     );
