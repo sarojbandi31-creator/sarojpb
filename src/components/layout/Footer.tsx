@@ -137,9 +137,12 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Rasayan Art Studio. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground justify-center">
+            <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
+            <Link to="/return-policy" className="hover:text-primary transition-colors">Return Policy</Link>
+            <Link to="/shipping-policy" className="hover:text-primary transition-colors">Shipping Policy</Link>
+            <Link to="/refund-policy" className="hover:text-primary transition-colors">Refunds Policy</Link>
           </div>
         </div>
       </div>

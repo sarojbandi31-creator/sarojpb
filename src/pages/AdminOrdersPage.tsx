@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useOrders, type Order, type OrderStatus } from '@/hooks/useOrders';
 
 const statusOptions: OrderStatus[] = [
@@ -22,6 +23,7 @@ function statusLabel(value: string) {
 export default function AdminOrdersPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading, isAdmin, roleResolved } = useAuth();
+  const { formatPrice } = useCurrency();
   const { loading, getAllOrders, adminUpdateOrderStatus } = useOrders();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -111,6 +113,7 @@ export default function AdminOrdersPage() {
                       </p>
                     </div>
                     <div className="text-right">
+                      <p className="font-serif text-lg text-primary">{formatPrice(order.total_price)}</p>
                       <p className="text-sm">Current: {statusLabel(order.order_status)}</p>
                       <p className="text-xs text-muted-foreground">Payment: {statusLabel(order.payment_status)}</p>
                     </div>

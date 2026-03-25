@@ -24,6 +24,11 @@ import CheckoutPage from "./pages/CheckoutPage";
 import OrdersPage from "./pages/OrdersPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
 import AdminOrdersPage from "./pages/AdminOrdersPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
+import ReturnPolicyPage from "./pages/ReturnPolicyPage";
+import ShippingPolicyPage from "./pages/ShippingPolicyPage";
+import RefundPolicyPage from "./pages/RefundPolicyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +66,11 @@ const App = () => (
                 <Route path="/article/:slug" element={<ArticleDetailPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/admin/orders" element={<AdminOrdersPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                <Route path="/return-policy" element={<ReturnPolicyPage />} />
+                <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
+                <Route path="/refund-policy" element={<RefundPolicyPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Artwork } from '@/hooks/useArtworks';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateShippingCost } from '@/data/shippingConfig';
 
 export interface CartItem {
   artwork: Artwork;
@@ -14,6 +15,8 @@ interface CartContextType {
   updateQuantity: (artworkId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
   getCartTotal: () => number;
+  getShippingCost: () => number;
+  getTotalWithShipping: () => number;
   getItemCount: () => number;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
@@ -236,6 +239,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const getShippingCost = () => {
+    const subtotal = getCartTotal();
+    return calculateShippingCost(subtotal);
+  };
+
+  const getTotalWithShipping = () => {
+    return getCartTotal() + getShippingCost();
+  };
+
   const getItemCount = () => {
     return items.reduce((count, item) => count + item.quantity, 0);
   };
@@ -249,6 +261,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         clearCart,
         getCartTotal,
+        getShippingCost,
+        getTotalWithShipping,
         getItemCount,
         isCartOpen,
         setIsCartOpen,

@@ -3,10 +3,11 @@ import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { formatShippingCost } from '@/data/shippingConfig';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeFromCart, clearCart, getCartTotal, getItemCount } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, getCartTotal, getShippingCost, getTotalWithShipping, getItemCount } = useCart();
   const { formatPrice } = useCurrency();
 
   return (
@@ -84,7 +85,7 @@ export default function CartPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span className="text-muted-foreground">Calculated at checkout</span>
+                  <span className="text-muted-foreground text-xs">{formatShippingCost(getShippingCost())}</span>
                 </div>
               </div>
 
@@ -92,7 +93,7 @@ export default function CartPage() {
 
               <div className="flex items-center justify-between mb-6">
                 <span className="font-serif text-lg">Total</span>
-                <span className="font-serif text-xl font-semibold">{formatPrice(getCartTotal())}</span>
+                <span className="font-serif text-xl font-semibold">{formatPrice(getTotalWithShipping())}</span>
               </div>
 
               <Button className="w-full" size="lg" onClick={() => navigate('/checkout')}>

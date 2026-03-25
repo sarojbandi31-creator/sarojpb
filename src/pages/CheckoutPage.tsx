@@ -7,10 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useAddresses, type AddressInput } from '@/hooks/useAddresses';
 import { useOrders } from '@/hooks/useOrders';
 import { useRazorpay } from '@/hooks/useRazorpay';
+import { formatShippingCost } from '@/data/shippingConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const defaultForm: AddressInput = {
   full_name: '',
@@ -28,7 +30,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { items, getCartTotal, clearCart } = useCart();
+  const { items, getCartTotal, getShippingCost, getTotalWithShipping, clearCart } = useCart();
   const { formatPrice } = useCurrency();
   const { addresses, loading: addressesLoading, addAddress, updateAddress, deleteAddress } = useAddresses();
   const { placeOrder } = useOrders();
@@ -39,15 +41,18 @@ export default function CheckoutPage() {
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [addressForm, setAddressForm] = useState<AddressInput>(defaultForm);
   const [notes, setNotes] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-  const total = getCartTotal();
+  const subtotal = getCartTotal();
+  const shippingCost = getShippingCost();
+  const total = getTotalWithShipping();
 
   const selectedAddress = useMemo(
     () => addresses.find((a) => a.id === selectedAddressId) || null,
     [addresses, selectedAddressId]
   );
 
-  const canCheckout = user && items.length > 0 && selectedAddress;
+  const canCheckout = user && items.length > 0 && selectedAddress && agreeToTerms;
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +98,15 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (!user) {
       navigate('/auth', { state: { returnTo: '/checkout' } });
+      return;
+    }
+
+    if (!agreeToTerms) {
+      toast({
+        title: 'Terms Required',
+        description: 'Please agree to the Terms of Service and Privacy Policy',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -343,15 +357,36 @@ export default function CheckoutPage() {
 
             <div className="flex items-center justify-between">
               <span>Subtotal</span>
-              <span>{formatPrice(total)}</span>
+              <span>{formatPrice(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between mt-2">
               <span>Shipping</span>
-              <span>Free</span>
+              <span>{formatShippingCost(shippingCost)}</span>
             </div>
-            <div className="flex items-center justify-between mt-4 font-serif text-lg">
+            <div className="flex items-center justify-between mt-4 font-serif text-lg border-t border-border pt-4">
               <span>Total</span>
               <span>{formatPrice(total)}</span>
+            </div>
+
+            {/* Terms Agreement */}
+            <div className="mt-6 space-y-3">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox
+                  checked={agreeToTerms}
+                  onCheckedChange={(checked) => setAgreeToTerms(Boolean(checked))}
+                  className="mt-1"
+                />
+                <span className="text-xs text-muted-foreground">
+                  I agree to the{' '}
+                  <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-accent">
+                    Terms of Service
+                  </a>
+                  {' '}and{' '}
+                  <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-accent">
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
             </div>
 
             <Button className="w-full mt-6" size="lg" disabled={!canCheckout || isLoading} onClick={handlePlaceOrder}>
@@ -359,6 +394,7 @@ export default function CheckoutPage() {
             </Button>
 
             {!user && <p className="text-sm text-muted-foreground mt-3">Login is required for checkout.</p>}
+            {!agreeToTerms && user && <p className="text-sm text-amber-600 mt-3">Please accept the terms to continue.</p>}
           </div>
         </div>
       </div>
